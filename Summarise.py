@@ -103,9 +103,9 @@ def load_resume_text(file_path):
 def main():
     resume_path = st.file_uploader("Upload your Resume (PDF path): ")
     resume_path=resume_path.strip()
-    role = st.write("Enter the hiring role: ")
+    role = st.text_input("Enter the hiring role: ")
 
-    groq_api_key = st.write("GROQ_API_KEY", type='password')
+    groq_api_key = st.text_input("GROQ_API_KEY", type='password')
     if not groq_api_key:
         raise RuntimeError("Missing GROQ_API_KEY in environment")
 
