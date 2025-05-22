@@ -128,7 +128,6 @@ def main():
     Return a score as a percentage out of 100 indicating the candidate's fit for the role.
     Also return the candidate's level as - Beginner, Intermediate or Advance.
     """
-
-    result = llm.invoke(template)
-
-    st.write("\n📊 Result:", result)
+    if st.button('Enter') and resume_path and groq_api_key and role:
+        result = llm.invoke(template)
+        st.write("\n📊 Result:", result)
