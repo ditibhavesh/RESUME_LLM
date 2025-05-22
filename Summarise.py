@@ -88,46 +88,56 @@
 #     main()
 
 
+import streamlit as st
 from langchain_groq import ChatGroq
 from pypdf import PdfReader
-import streamlit as st
+import os
 
-def load_resume_text(file_path):
-    reader = PdfReader(file_path)
+# Load PDF and extract text
+def load_resume_text(file):
+    reader = PdfReader(file)
     content = ""
     for page in reader.pages:
         content += page.extract_text()
     return content
 
-
+# Streamlit UI
 def main():
-    resume_path = st.file_uploader("Upload your Resume (PDF path): ")
-    resume_path=resume_path.strip()
-    role = st.text_input("Enter the hiring role: ")
+    st.title("Resume Evaluator")
+    uploaded_file = st.file_uploader("Upload your Resume (PDF)", type=["pdf"])
+    role = st.text_input("Enter the hiring role:")
+    groq_api_key = st.text_input("Enter your GROQ_API_KEY:", type='password')
 
-    groq_api_key = st.text_input("GROQ_API_KEY", type='password')
-    if not groq_api_key:
-        raise RuntimeError("Missing GROQ_API_KEY in environment")
+    if st.button("Evaluate") and uploaded_file and role and groq_api_key:
+        # Load and process resume
+        resume_text = load_resume_text(uploaded_file)
 
-    resume_text = load_resume_text(resume_path)
+        # Initialize LLM
+        llm = ChatGroq(
+            api_key=groq_api_key,
+            model="llama3-70b-8192",
+            temperature=0.2,
+            max_tokens=1024
+        )
 
-    llm = ChatGroq(
-        api_key=groq_api_key,
-        model="llama3-70b-8192",
-        temperature=0.2,
-        max_tokens=1024
-    )
+        # Prompt template
+        prompt = f"""
+        You are a hiring assistant for a company, hiring for the role of "{role}".
+        Review the following resume:
+        ---
+        {resume_text}
+        ---
+        Evaluate how appropriate the person is for the role based on previous experience and technical skills.
+        Return:
+        - A score as a percentage (0-100) for candidate fit.
+        - Candidate level: Beginner, Intermediate, or Advanced.
+        """
 
-    template = f"""
-    You are a hiring assistant for a company, hiring for the role of "{role}".
-    Review the following resume:
-    ---
-    {resume_text}
-    ---
-    Look at previous experience and technical skills, and evaluate how appropriate the person is for the role.
-    Return a score as a percentage out of 100 indicating the candidate's fit for the role.
-    Also return the candidate's level as - Beginner, Intermediate or Advance.
-    """
-    if st.button('Enter') and resume_path and groq_api_key and role:
-        result = llm.invoke(template)
-        st.write("\n📊 Result:", result)
+        # Get result
+        result = llm.invoke(prompt)
+        st.subheader("📊 Evaluation Result")
+        st.write(result)
+
+if __name__ == "__main__":
+    main()
+
