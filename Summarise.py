@@ -88,56 +88,141 @@
 #     main()
 
 
-import streamlit as st
 from langchain_groq import ChatGroq
 from pypdf import PdfReader
+import streamlit as st
+from langchain.chains import ConversationChain
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+from langchain.vectorstores import Chroma
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationalRetrievalChain
+from langchain_groq import ChatGroq
+from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 import os
 
-# Load PDF and extract text
-def load_resume_text(file):
-    reader = PdfReader(file)
+def load_resume_text(file_path):
+    reader = PdfReader(file_path)
     content = ""
     for page in reader.pages:
         content += page.extract_text()
     return content
 
-# Streamlit UI
-def main():
-    st.title("Resume Evaluator")
-    uploaded_file = st.file_uploader("Upload your Resume (PDF)", type=["pdf"])
-    role = st.text_input("Enter the hiring role:")
-    groq_api_key = st.text_input("Enter your GROQ_API_KEY:", type='password')
 
-    if st.button("Evaluate") and uploaded_file and role and groq_api_key:
-        # Load and process resume
-        resume_text = load_resume_text(uploaded_file)
+def judge_candidates_fit(groq_api_key, role, resume_text):
+    llm = ChatGroq(
+        api_key=groq_api_key,
+        model="llama3-70b-8192",
+        temperature=0.2,
+        max_tokens=1024
+    )
 
-        # Initialize LLM
-        llm = ChatGroq(
-            api_key=groq_api_key,
-            model="llama3-70b-8192",
-            temperature=0.2,
-            max_tokens=1024
-        )
-
-        # Prompt template
-        prompt = f"""
+    template = f"""
         You are a hiring assistant for a company, hiring for the role of "{role}".
         Review the following resume:
         ---
         {resume_text}
         ---
-        Evaluate how appropriate the person is for the role based on previous experience and technical skills.
-        Return:
-        - A score as a percentage (0-100) for candidate fit.
-        - Candidate level: Beginner, Intermediate, or Advanced.
+        Look at previous experience and technical skills, and evaluate how appropriate the person is for the role.
+        Return a score as a percentage out of 100 indicating the candidate's fit for the role.
+        Also return the candidate's level as - Beginner, Intermediate or Advance.
         """
 
-        # Get result
-        result = llm.invoke(prompt)
-        st.subheader("📊 Evaluation Result")
-        st.write(result)
+    # result = llm.invoke(template)
+    prompt = PromptTemplate(
+        inputVariables = ['role', 'resume_text'],
+        template=template
+    )
+    chain = LLMChain(llm=llm, prompt=prompt)
+    return chain.run({"role": role, "resume_text": resume_text})
+
+
+def suggest_interview_question(api_key, role, evaluation_summary):
+    """Generate a follow-up interview question based on candidate evaluation."""
+    llm = ChatGroq(api_key=api_key, model="llama3-70b-8192", temperature=0.2, max_tokens=1024)
+
+    prompt = f"""
+    You are a hiring assistant for a company hiring for the role of "{role}".
+    Based on the evaluation below:
+    ---
+    {evaluation_summary}
+    ---
+    Ask the next interview question, structured as:
+    - 70% technical
+    - 20% problem-solving/brain-stimulating
+    - 10% soft skills
+    Just return the next question, no explanations.
+    """
+    return llm.invoke(prompt).content
+
+
+def assess_answers_and_skills(groq_api_key, role, question, answer):
+    llm = ChatGroq(
+        api_key=groq_api_key,
+        model="llama3-70b-8192",
+        temperature=0.2,
+        max_tokens=1024
+    )
+
+    prompt_text = f"""
+    You are a hiring assistant for a company, hiring for the role of "{role}".
+    Here is the interview question asked:
+    ---
+    {question}
+    ---
+    And here is the candidate's answer:
+    ---
+    {answer}
+    ---
+    Now assess the candidate's answering skill.
+    Re-evaluate their level (Beginner, Intermediate, or Advanced) and provide a new fit score out of 100.
+    """
+
+    return llm.invoke(prompt_text).content
+
+
+def main():
+    resume_path = st.file_uploader("Upload your Resume (PDF path): ")
+    role = st.text_input("Enter the hiring role: ")
+
+    groq_api_key = st.text_input("GROQ_API_KEY", type='password')
+
+    if "question" not in st.session_state:
+        st.session_state.question = ""
+    if "evaluation_result" not in st.session_state:
+        st.session_state.evaluation_result = ""
+    if "asked" not in st.session_state:
+        st.session_state.asked = False
+
+        # Step 2: Evaluate Resume
+    if st.button("Evaluate Resume") and resume_path and role and groq_api_key:
+        resume_text = load_resume_text(resume_path)
+        st.session_state.evaluation_result = judge_candidates_fit(groq_api_key, role, resume_text)
+        st.write("### 📊 Evaluation Result")
+        st.write(st.session_state.evaluation_result)
+
+        st.session_state.question = suggest_interview_question(groq_api_key, role, st.session_state.evaluation_result)
+        st.session_state.asked = True
+
+        # Step 3: Ask Interview Question
+    if st.session_state.asked and st.session_state.question:
+        st.write("### 💬 Interview Question")
+        st.write(st.session_state.question)
+        answer = st.text_area("✍️ Candidate's Answer")
+
+        if st.button("Assess Answer"):
+            final_result = assess_answers_and_skills(
+                groq_api_key,
+                role,
+                st.session_state.question,
+                answer
+            )
+            st.write("### 🧠 Updated Evaluation")
+            st.write(final_result)
+
 
 if __name__ == "__main__":
     main()
+
 
