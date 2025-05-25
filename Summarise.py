@@ -158,7 +158,7 @@ def main():
         st.session_state.final_summary = ""
 
         st.write("### 📊 Evaluation Result")
-        st.write(evaluation["raw"])
+        st.write(evaluation)
 
         if evaluation["score"] < 40:
             st.warning("Candidate score is below 40. Not a good fit for the role.")
