@@ -16,7 +16,7 @@ def load_resume_text(file_path):
 def judge_candidates_fit(openai_api_key, role, resume_text):
     llm = ChatOpenAI(
         api_key=openai_api_key,
-        model_name="gpt-3.5-turbo",
+        model_name="gpt-3.5",
         temperature=0.3,  # or tune as needed
         max_tokens=1024
     )
@@ -54,7 +54,7 @@ def suggest_interview_question(openai_api_key, role, evaluation_summary, count, 
     # llm = ChatGroq(api_key=api_key, model="llama3-70b-8192", temperature=0.7, max_tokens=1024)
     llm = ChatOpenAI(
         api_key=openai_api_key,
-        model_name="gpt-3.5-turbo",
+        model_name="gpt-3.5",
         temperature=0.3,  # or tune as needed
         max_tokens=1024
     )
@@ -85,7 +85,7 @@ def suggest_interview_question(openai_api_key, role, evaluation_summary, count, 
 def assess_answers_and_skills(openai_api_key, role, question, answer):
     llm = ChatOpenAI(
         api_key=openai_api_key,
-        model_name="gpt-3.5-turbo",
+        model_name="gpt-3.5",
         temperature=0.3,  # or tune as needed
         max_tokens=1024
     )
@@ -118,7 +118,7 @@ def final_evaluation_summary(openai_api_key, role, questions, answers, initial_e
 
     llm = ChatOpenAI(
         api_key=openai_api_key,
-        model_name="gpt-3.5-turbo",
+        model_name="gpt-3.5",
         temperature=0.3,  # or tune as needed
         max_tokens=1024
     )
