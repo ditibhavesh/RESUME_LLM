@@ -223,34 +223,38 @@ def main():
             if count:
                 count = int(count)
 
-                if "question" not in st.session_state:
-                    st.session_state.question = ""
-                if "evaluation_result" not in st.session_state:
-                    st.session_state.evaluation_result = ""
-                if "asked" not in st.session_state:
-                    st.session_state.asked = False
-
-                st.session_state.question = suggest_interview_question(
-                    groq_api_key, role, st.session_state.evaluation_result["raw"], count)
-                st.session_state.asked = True
-
-                answers = []
-                for i in range(count):
-                    if st.session_state.asked and st.session_state.question:
-                        st.write("### 💬 Interview Question")
-                        st.write(st.session_state.question)
-                        answers.append(st.text_area(f"✍️ Candidate's Answer {i + 1}"))
-
-                for  answer in answers:
-                    if st.button(f"Assess Answer"):  # Use unique key
-                        final_result = assess_answers_and_skills(
+                if st.button("Generate Interview Questions"):
+                    st.session_state.questions = []
+                    for i in range(count):
+                        question = suggest_interview_question(
                             groq_api_key,
                             role,
-                            st.session_state.question,
-                            answer
+                            st.session_state.evaluation_result["raw"],
+                            count
                         )
-                        st.write(f"🧠 Updated Evaluation for Answers")
-                        st.write(final_result)
+                        st.session_state.questions.append(question)
+                        st.session_state.answers.append("")  # placeholder
+
+                    # Step 2: Ask for Answers
+                if st.session_state.questions:
+                    for i, q in enumerate(st.session_state.questions):
+                        st.write(f"### 💬 Question {i + 1}")
+                        st.write(q)
+                        st.session_state.answers[i] = st.text_area(
+                            f"✍️ Candidate's Answer {i + 1}", value=st.session_state.answers[i])
+
+                    # Step 3: Assess Answers
+                    if st.button("Assess All Answers"):
+                        for i, answer in enumerate(st.session_state.answers):
+                            if answer.strip():
+                                final_result = assess_answers_and_skills(
+                                    groq_api_key,
+                                    role,
+                                    st.session_state.questions[i],
+                                    answer
+                                )
+                                st.write(f"🧠 Updated Evaluation for Answer {i + 1}")
+                                st.write(final_result)
 
 if __name__ == "__main__":
     main()
