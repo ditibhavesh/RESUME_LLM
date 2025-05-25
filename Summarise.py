@@ -162,13 +162,14 @@ def suggest_interview_question(api_key, role, evaluation_summary, count):
     ---
     If the score is below 40 and candidate is not a fit for the role - just return 'Sorry, we would not like to proceed with your candidature, please try again for a role that appeals to you'
     if score is above 40 , based on the candidate's level - Ask interview questions, structured as:
-    - 70% technical
-    - 20% problem-solving/brain-stimulating
-    - 10% soft skills
-    based on {count}, Just return the next question, with no explanations.
+    If level is beginner ask 5 questions easy questions, if intermediate then ask 4 medium difficulty questions and if advanced then all 3 difficult technical questions
+    Just return the next question, with no explanations.
     """
     return llm.invoke(prompt).content
 
+    # - 70% technical
+    # - 20% problem-solving/brain-stimulating
+    # - 10% soft skills
 
 def assess_answers_and_skills(groq_api_key, role, question, answer):
     llm = ChatGroq(
@@ -214,57 +215,44 @@ def main():
             st.warning("Candidate score is below 40. Not a good fit for the role.")
             st.stop()  # Stop further execution
         else:
-            # Count selection
-            count = st.selectbox(
-                "How many questions to ask?",
-                ("1", "2", "3", "4", "5"),
-                index=None,
-                placeholder="Select No of questions",
-            )
 
-            if count:
-                count = int(count)
+            if "questions" not in st.session_state:
+                st.session_state.questions = []
+            if "evaluation_result" not in st.session_state:
+                st.session_state.evaluation_result = evaluation  # from earlier
+            if "answers" not in st.session_state:
+                st.session_state.answers = []
 
-                if "questions" not in st.session_state:
-                    st.session_state.questions = []
-                if "evaluation_result" not in st.session_state:
-                    st.session_state.evaluation_result = evaluation  # from earlier
-                if "answers" not in st.session_state:
-                    st.session_state.answers = []
+            if st.button("Generate Interview Questions"):
+                st.session_state.questions = []
+                question = suggest_interview_question(
+                    groq_api_key,
+                    role,
+                    st.session_state.evaluation_result["raw"],
 
-                # Step 1: Generate Questions
-                if st.button("Generate Interview Questions"):
-                    st.session_state.questions = []
-                    for i in range(count):
-                        question = suggest_interview_question(
-                            groq_api_key,
-                            role,
-                            st.session_state.evaluation_result["raw"],
-                            count
-                        )
-                        st.session_state.questions.append(question)
-                        st.session_state.answers.append("")  # placeholder
+                )
+                st.session_state.questions.append(question)
+                st.session_state.answers.append("")  # placeholder
 
-                # Step 2: Ask for Answers
-                if st.session_state.questions:
-                    for i, q in enumerate(st.session_state.questions):
-                        st.write(f"### 💬 Question {i + 1}")
-                        st.write(q)
-                        st.session_state.answers[i] = st.text_area(
-                            f"✍️ Candidate's Answer {i + 1}", value=st.session_state.answers[i])
+            if st.session_state.questions:
+                for i, q in enumerate(st.session_state.questions):
+                    st.write(f"### 💬 Question {i + 1}")
+                    st.write(q)
+                    st.session_state.answers[i] = st.text_area(
+                        f"✍️ Candidate's Answer {i + 1}", value=st.session_state.answers[i])
 
-                    # Step 3: Assess Answers
-                    if st.button("Assess All Answers"):
-                        for i, answer in enumerate(st.session_state.answers):
-                            if answer.strip():
-                                final_result = assess_answers_and_skills(
-                                    groq_api_key,
-                                    role,
-                                    st.session_state.questions[i],
-                                    answer
-                                )
-                                st.write(f"🧠 Updated Evaluation for Answer {i + 1}")
-                                st.write(final_result)
+                # Step 3: Assess Answers
+                if st.button("Assess All Answers"):
+                    for i, answer in enumerate(st.session_state.answers):
+                        if answer.strip():
+                            final_result = assess_answers_and_skills(
+                                groq_api_key,
+                                role,
+                                st.session_state.questions[i],
+                                answer
+                            )
+                            st.write(f"🧠 Updated Evaluation for Answer {i + 1}")
+                            st.write(final_result)
 
 
 if __name__ == "__main__":
