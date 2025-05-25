@@ -1,4 +1,5 @@
 from langchain_groq import ChatGroq
+from langchain.chat_models import ChatOpenAI
 from pypdf import PdfReader
 import streamlit as st
 import re
@@ -12,11 +13,11 @@ def load_resume_text(file_path):
     return content
 
 
-def judge_candidates_fit(groq_api_key, role, resume_text):
-    llm = ChatGroq(
-        api_key=groq_api_key,
-        model="llama3-70b-8192",
-        temperature=0.2,
+def judge_candidates_fit(openai_api_key, role, resume_text):
+    llm = ChatOpenAI(
+        api_key=openai_api_key,
+        model_name="gpt-3.5-turbo",
+        temperature=0.3,  # or tune as needed
         max_tokens=1024
     )
 
@@ -50,7 +51,13 @@ def judge_candidates_fit(groq_api_key, role, resume_text):
 
 
 def suggest_interview_question(api_key, role, evaluation_summary, count, asked_questions):
-    llm = ChatGroq(api_key=api_key, model="llama3-70b-8192", temperature=0.7, max_tokens=1024)
+    # llm = ChatGroq(api_key=api_key, model="llama3-70b-8192", temperature=0.7, max_tokens=1024)
+    llm = ChatOpenAI(
+        api_key=openai_api_key,
+        model_name="gpt-3.5-turbo",
+        temperature=0.3,  # or tune as needed
+        max_tokens=1024
+    )
 
     asked_questions_str = "\n".join(f"- {q}" for q in asked_questions)
 
@@ -76,10 +83,10 @@ def suggest_interview_question(api_key, role, evaluation_summary, count, asked_q
 
 
 def assess_answers_and_skills(groq_api_key, role, question, answer):
-    llm = ChatGroq(
-        api_key=groq_api_key,
-        model="llama3-70b-8192",
-        temperature=0.2,
+    llm = ChatOpenAI(
+        api_key=openai_api_key,
+        model_name="gpt-3.5-turbo",
+        temperature=0.3,  # or tune as needed
         max_tokens=1024
     )
 
@@ -102,12 +109,20 @@ def assess_answers_and_skills(groq_api_key, role, question, answer):
 
 
 def final_evaluation_summary(groq_api_key, role, questions, answers, initial_evaluation):
-    llm = ChatGroq(
-        api_key=groq_api_key,
-        model="llama3-70b-8192",
-        temperature=0.3,
+    # llm = ChatGroq(
+    #     api_key=groq_api_key,
+    #     model="llama3-70b-8192",
+    #     temperature=0.3,
+    #     max_tokens=1024
+    # )
+
+    llm = ChatOpenAI(
+        api_key=openai_api_key,
+        model_name="gpt-3.5-turbo",
+        temperature=0.3,  # or tune as needed
         max_tokens=1024
     )
+
     qa_pairs = "\n\n".join([f"Q: {q}\nA: {a}" for q, a in zip(questions, answers)])
 
     prompt = f"""
@@ -200,7 +215,7 @@ def main():
 
             # Max questions per level
             level = st.session_state.evaluation_result["level"].lower()
-            max_questions_map = {"beginner": 5, "intermediate": 2, "advanced": 3}
+            max_questions_map = {"beginner": 4, "intermediate": 3, "advanced": 2}
             max_questions = max_questions_map.get(level, 3)
 
             if idx + 1 >= max_questions:
