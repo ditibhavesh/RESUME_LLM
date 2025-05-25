@@ -110,6 +110,8 @@ def load_resume_text(file_path):
     return content
 
 
+import re
+
 def judge_candidates_fit(groq_api_key, role, resume_text):
     llm = ChatGroq(
         api_key=groq_api_key,
@@ -119,26 +121,36 @@ def judge_candidates_fit(groq_api_key, role, resume_text):
     )
 
     template = f"""
-        You are a hiring assistant for a company, hiring for the role of "{role}".
-        Review the following resume:
-        ---
-        {resume_text}
-        ---
-        Look at previous experience and technical skills, and evaluate how appropriate the person is for the role.
-        Return a score as a percentage out of 100 indicating the candidate's fit for the role.
-        Also return the candidate's level as - Beginner, Intermediate or Advance.
-        """
+    You are a hiring assistant for a company, hiring for the role of "{role}".
+    Review the following resume:
+    ---
+    {resume_text}
+    ---
+    Evaluate how appropriate the person is for the role.
+    Return only this format:
+    "Score: <number>%\nLevel: <Beginner/Intermediate/Advanced/Not a good fit for the role>"
+    """
 
-    # result = llm.invoke(template)
-    prompt = PromptTemplate(
-        inputVariables = ['role', 'resume_text'],
-        template=template
-    )
-    chain = LLMChain(llm=llm, prompt=prompt)
-    return chain.run({"role": role, "resume_text": resume_text})
+    result = llm.invoke(template).content
+
+    # Extract score and level
+    match = re.search(r'Score:\s*(\d+)%\s*Level:\s*(.*)', result)
+    if match:
+        score = int(match.group(1))
+        level = match.group(2).strip()
+    else:
+        score = 0
+        level = "Not a good fit for the role"
+
+    return {
+        "raw": result,
+        "score": score,
+        "level": level
+    }
 
 
-def suggest_interview_question(api_key, role, evaluation_summary):
+
+def suggest_interview_question(api_key, role, evaluation_summary, count):
     """Generate a follow-up interview question based on candidate evaluation."""
     llm = ChatGroq(api_key=api_key, model="llama3-70b-8192", temperature=0.2, max_tokens=1024)
 
@@ -148,11 +160,12 @@ def suggest_interview_question(api_key, role, evaluation_summary):
     ---
     {evaluation_summary}
     ---
-    Ask the next interview question, structured as:
+    If the score is below 50 and candidate is not a fit for the role - just return 'Sorry, we would not like to proceed with your candidature, please try again for a role that appeals to you'
+    if score is above 50 , based on the candidate's level - Ask interview questions, structured as:
     - 70% technical
     - 20% problem-solving/brain-stimulating
     - 10% soft skills
-    Just return the next question, no explanations.
+    based on {count}, Just return the next question, with no explanations.
     """
     return llm.invoke(prompt).content
 
@@ -177,6 +190,7 @@ def assess_answers_and_skills(groq_api_key, role, question, answer):
     ---
     Now assess the candidate's answering skill.
     Re-evaluate their level (Beginner, Intermediate, or Advanced) and provide a new fit score out of 100.
+    While recalculation take into account the previous fit score and then provide the new score.
     """
 
     return llm.invoke(prompt_text).content
@@ -188,49 +202,57 @@ def main():
 
     groq_api_key = st.text_input("GROQ_API_KEY", type='password')
 
-    if "question" not in st.session_state:
-        st.session_state.question = ""
-    if "evaluation_result" not in st.session_state:
-        st.session_state.evaluation_result = ""
-    if "asked" not in st.session_state:
-        st.session_state.asked = False
-
         # Step 2: Evaluate Resume
     if st.button("Evaluate Resume") and resume_path and role and groq_api_key:
         resume_text = load_resume_text(resume_path)
-        st.session_state.evaluation_result = judge_candidates_fit(groq_api_key, role, resume_text)
+        evaluation = judge_candidates_fit(groq_api_key, role, resume_text)
+        st.session_state.evaluation_result = evaluation
         st.write("### 📊 Evaluation Result")
-        st.write(st.session_state.evaluation_result)
+        st.write(evaluation["raw"])
+        st.write(f"Score: {evaluation['score']}%")
 
-        st.session_state.question = suggest_interview_question(groq_api_key, role, st.session_state.evaluation_result)
-        st.session_state.asked = True
+        if evaluation["score"] < 50:
+            st.warning("Candidate score is below 50. Not a good fit for the role.")
+            st.stop()  # Stop further execution
+        else:
+            count = st.selectbox(
+                "How many questions to ask?",
+                ("1", "2", "3", "4", "5"),
+                index=None,
+                placeholder="Select No of questions",
+            )
 
-    count = st.selectbox(
-        "How many questions to ask?",
-        ("1", "2", "3", "4", "5"),
-        index=None,
-        placeholder="Select no.of questions",
-    )
+            count = int(count)
 
-    answers=[]
-    for i in range(int(count)):
-        if st.session_state.asked and st.session_state.question:
-            st.write("### 💬 Interview Question")
-            st.write(st.session_state.question)
-            # answer = st.text_area("✍️ Candidate's Answer")
-            answers.append(st.text_area(f"✍️ Candidate's Answer {i + 1}"))
+            if "question" not in st.session_state:
+                st.session_state.question = ""
+            if "evaluation_result" not in st.session_state:
+                st.session_state.evaluation_result = ""
+            if "asked" not in st.session_state:
+                st.session_state.asked = False
 
+            st.session_state.question = suggest_interview_question(
+                groq_api_key, role, st.session_state.evaluation_result["raw"], count)
+            st.session_state.asked = True
 
-    for i,answer in enumerate(answers):
-        if st.button("Assess Answer"):
-                final_result = assess_answers_and_skills(
-                    groq_api_key,
-                    role,
-                    st.session_state.question,
-                    answer
-                )
-                st.write("### 🧠 Updated Evaluation")
-                st.write(final_result)
+            answers=[]
+            for i in range(count):
+                if st.session_state.asked and st.session_state.question:
+                    st.write("### 💬 Interview Question")
+                    st.write(st.session_state.question)
+                    # answer = st.text_area("✍️ Candidate's Answer")
+                    answers.append(st.text_area(f"✍️ Candidate's Answer {i + 1}"))
+
+            for i,answer in enumerate(answers):
+                if st.button("Assess Answer"):
+                        final_result = assess_answers_and_skills(
+                            groq_api_key,
+                            role,
+                            st.session_state.question,
+                            answer
+                        )
+                        st.write("### 🧠 Updated Evaluation")
+                        st.write(final_result)
 
 
 if __name__ == "__main__":
