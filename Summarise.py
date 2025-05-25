@@ -179,7 +179,7 @@ def main():
         idx = st.session_state.current_index
         question = st.session_state.questions[idx]
 
-        st.write(f"### 💬 Question {idx + 1}")
+        st.write(f"💬 Question {idx + 1}")
         st.write(question)
 
         answer = st.text_area(f"✍️ Candidate's Answer to Question {idx + 1}",
@@ -192,14 +192,11 @@ def main():
             st.session_state.answers[idx] = answer
 
             # Assess answer & update evaluation
-            result = assess_answers_and_skills(
-                groq_api_key, role, question, answer
-            )
-            st.write(f"🧠 Updated Evaluation for Answer {idx + 1}")
-            st.write(result)
-
-            # Update stored evaluation raw with latest (optional, or keep original)
-            # Here we keep original for next question generation consistency
+            # result = assess_answers_and_skills(
+            #     groq_api_key, role, question, answer
+            # )
+            # st.write(f"🧠 Updated Evaluation for Answer {idx + 1}")
+            # st.write(result)
 
             # Max questions per level
             level = st.session_state.evaluation_result["level"].lower()
@@ -207,7 +204,6 @@ def main():
             max_questions = max_questions_map.get(level, 3)
 
             if idx + 1 >= max_questions:
-                # Finished all questions, provide final summary
                 st.session_state.finished = True
                 st.session_state.final_summary = final_evaluation_summary(
                     groq_api_key, role, st.session_state.questions, st.session_state.answers,
@@ -217,7 +213,6 @@ def main():
                 st.write(st.session_state.final_summary)
 
             else:
-                # Get next question, avoiding repeats
                 next_question = suggest_interview_question(
                     groq_api_key, role, st.session_state.evaluation_result["raw"], idx + 2, st.session_state.questions
                 )
