@@ -50,7 +50,7 @@ def judge_candidates_fit(openai_api_key, role, resume_text):
     }
 
 
-def suggest_interview_question(api_key, role, evaluation_summary, count, asked_questions):
+def suggest_interview_question(openai_api_key, role, evaluation_summary, count, asked_questions):
     # llm = ChatGroq(api_key=api_key, model="llama3-70b-8192", temperature=0.7, max_tokens=1024)
     llm = ChatOpenAI(
         api_key=openai_api_key,
@@ -82,7 +82,7 @@ def suggest_interview_question(api_key, role, evaluation_summary, count, asked_q
     return llm.invoke(prompt).content
 
 
-def assess_answers_and_skills(groq_api_key, role, question, answer):
+def assess_answers_and_skills(openai_api_key, role, question, answer):
     llm = ChatOpenAI(
         api_key=openai_api_key,
         model_name="gpt-3.5-turbo",
@@ -108,7 +108,7 @@ def assess_answers_and_skills(groq_api_key, role, question, answer):
     return llm.invoke(prompt_text).content
 
 
-def final_evaluation_summary(groq_api_key, role, questions, answers, initial_evaluation):
+def final_evaluation_summary(openai_api_key, role, questions, answers, initial_evaluation):
     # llm = ChatGroq(
     #     api_key=groq_api_key,
     #     model="llama3-70b-8192",
@@ -147,7 +147,7 @@ def final_evaluation_summary(groq_api_key, role, questions, answers, initial_eva
 def main():
     resume_path = st.file_uploader("Upload your Resume (PDF): ")
     role = st.text_input("Enter the hiring role: ")
-    groq_api_key = st.text_input("GROQ_API_KEY", type='password')
+    groq_api_key = st.text_input("OPENAI_API_KEY", type='password')
 
     if "evaluation_result" not in st.session_state:
         st.session_state.evaluation_result = None
@@ -172,7 +172,7 @@ def main():
         st.session_state.finished = False
         st.session_state.final_summary = ""
 
-        st.write("### 📊 Evaluation Result")
+        st.write("📊 Evaluation Result")
         st.write(evaluation['raw'])
 
         if evaluation["score"] < 40:
