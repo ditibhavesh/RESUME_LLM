@@ -160,8 +160,8 @@ def suggest_interview_question(api_key, role, evaluation_summary, count):
     ---
     {evaluation_summary}
     ---
-    If the score is below 50 and candidate is not a fit for the role - just return 'Sorry, we would not like to proceed with your candidature, please try again for a role that appeals to you'
-    if score is above 50 , based on the candidate's level - Ask interview questions, structured as:
+    If the score is below 40 and candidate is not a fit for the role - just return 'Sorry, we would not like to proceed with your candidature, please try again for a role that appeals to you'
+    if score is above 40 , based on the candidate's level - Ask interview questions, structured as:
     - 70% technical
     - 20% problem-solving/brain-stimulating
     - 10% soft skills
@@ -209,10 +209,9 @@ def main():
         st.session_state.evaluation_result = evaluation
         st.write("### 📊 Evaluation Result")
         st.write(evaluation["raw"])
-        st.write(f"Score: {evaluation['score']}%")
 
-        if evaluation["score"] < 50:
-            st.warning("Candidate score is below 50. Not a good fit for the role.")
+        if evaluation["score"] < 40:
+            st.warning("Candidate score is below 40. Not a good fit for the role.")
             st.stop()  # Stop further execution
         else:
             count = st.selectbox(
@@ -221,39 +220,37 @@ def main():
                 index=None,
                 placeholder="Select No of questions",
             )
+            if count:
+                count = int(count)
 
-            count = int(count)
+                if "question" not in st.session_state:
+                    st.session_state.question = ""
+                if "evaluation_result" not in st.session_state:
+                    st.session_state.evaluation_result = ""
+                if "asked" not in st.session_state:
+                    st.session_state.asked = False
 
-            if "question" not in st.session_state:
-                st.session_state.question = ""
-            if "evaluation_result" not in st.session_state:
-                st.session_state.evaluation_result = ""
-            if "asked" not in st.session_state:
-                st.session_state.asked = False
+                st.session_state.question = suggest_interview_question(
+                    groq_api_key, role, st.session_state.evaluation_result["raw"], count)
+                st.session_state.asked = True
 
-            st.session_state.question = suggest_interview_question(
-                groq_api_key, role, st.session_state.evaluation_result["raw"], count)
-            st.session_state.asked = True
+                answers = []
+                for i in range(count):
+                    if st.session_state.asked and st.session_state.question:
+                        st.write("### 💬 Interview Question")
+                        st.write(st.session_state.question)
+                        answers.append(st.text_area(f"✍️ Candidate's Answer {i + 1}"))
 
-            answers=[]
-            for i in range(count):
-                if st.session_state.asked and st.session_state.question:
-                    st.write("### 💬 Interview Question")
-                    st.write(st.session_state.question)
-                    # answer = st.text_area("✍️ Candidate's Answer")
-                    answers.append(st.text_area(f"✍️ Candidate's Answer {i + 1}"))
-
-            for i,answer in enumerate(answers):
-                if st.button("Assess Answer"):
+                for  answer in answers:
+                    if st.button(f"Assess Answer"):  # Use unique key
                         final_result = assess_answers_and_skills(
                             groq_api_key,
                             role,
                             st.session_state.question,
                             answer
                         )
-                        st.write("### 🧠 Updated Evaluation")
+                        st.write(f"🧠 Updated Evaluation for Answers")
                         st.write(final_result)
-
 
 if __name__ == "__main__":
     main()
