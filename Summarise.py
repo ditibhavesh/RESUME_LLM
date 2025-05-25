@@ -1,93 +1,3 @@
-# import os
-# from dotenv import load_dotenv
-# from langchain_groq import ChatGroq
-# from langchain.embeddings import HuggingFaceEmbeddings
-# from langchain.schema import SystemMessage, HumanMessage, Document
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
-# from langchain.memory import ConversationBufferMemory
-# from langchain.chains import ConversationalRetrievalChain
-# from pypdf import PdfReader
-# from langchain.prompts import (
-#     ChatPromptTemplate,
-#     HumanMessagePromptTemplate,
-#     SystemMessagePromptTemplate,
-# )
-# from langchain_community.vectorstores import FAISS
-#
-# load_dotenv(override=True)
-# groq_api_key = os.getenv("GROQ_API_KEY")
-# if not groq_api_key:
-#     raise RuntimeError("Missing GROQ_API_KEY in environment")
-#
-#
-# # 1. Load resumes
-# def load_resumes(file_paths):
-#     resume_texts = {}
-#     for path in file_paths:
-#         reader = PdfReader(path)
-#         content = ""
-#         for page in reader.pages:
-#             content += page.extract_text()
-#         resume_texts[os.path.basename(path)] = content
-#     return resume_texts
-#
-#
-# # def create_chunks(text):
-# #     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-# #     return [Document(page_content=chunk) for chunk in splitter.split_text(text)]
-#
-#
-# # # 3. Embed and save separately
-# # def create_vector_db_per_resume(resume_dict):
-# #     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-# #     return embeddings
-#
-# def get_conversation_chain(resume_texts) -> ConversationalRetrievalChain:
-#     llm = ChatGroq(
-#         api_key=groq_api_key,
-#         model="llama3-70b-8192",
-#         temperature=0.2,
-#         max_tokens=1024
-#     )
-#
-#     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-#     role = input('Enter the hiring role')
-#
-#     system_prompt = SystemMessagePromptTemplate.from_template(
-#         """
-#         You are a hiring assistant for a company, you are hiring for the role of a \"\"\"{role}\"\"\"
-#         Review the reume, look at previous experience if any and technical skills if appropriate for the role.
-#         You should return result as percentage, as to how appropriate the person is for the role.
-#         """
-#     )
-#
-#     prompt_template = ChatPromptTemplate.from_messages([
-#         system_prompt
-#     ])
-#
-#     conversation_chain = ConversationalRetrievalChain.from_llm(
-#         llm=llm,
-#         retriever=vector_store.as_retriever(),
-#         memory=memory,
-#         combine_docs_chain_kwargs={"prompt": prompt_template},
-#     )
-#     return conversation_chain
-#
-#
-# def main():
-#     path = input("Upload your Resume: ")
-#     file_path = path.strip()
-#     resume_contents = load_resumes(file_path)
-#     get_conversation_chain()
-#
-#
-#
-#
-#
-# if __name__ == "__main__":
-#     main()
-
-
 from langchain_groq import ChatGroq
 from pypdf import PdfReader
 import streamlit as st
@@ -200,59 +110,72 @@ def assess_answers_and_skills(groq_api_key, role, question, answer):
 def main():
     resume_path = st.file_uploader("Upload your Resume (PDF path): ")
     role = st.text_input("Enter the hiring role: ")
-
     groq_api_key = st.text_input("GROQ_API_KEY", type='password')
 
-        # Step 2: Evaluate Resume
+    # Setup session state
+    if "evaluation_result" not in st.session_state:
+        st.session_state.evaluation_result = None
+    if "questions" not in st.session_state:
+        st.session_state.questions = []
+    if "answers" not in st.session_state:
+        st.session_state.answers = []
+    if "current_index" not in st.session_state:
+        st.session_state.current_index = 0
+
     if st.button("Evaluate Resume") and resume_path and role and groq_api_key:
         resume_text = load_resume_text(resume_path)
         evaluation = judge_candidates_fit(groq_api_key, role, resume_text)
         st.session_state.evaluation_result = evaluation
+        st.session_state.questions = []
+        st.session_state.answers = []
+        st.session_state.current_index = 0
+
         st.write("### 📊 Evaluation Result")
         st.write(evaluation["raw"])
 
         if evaluation["score"] < 40:
             st.warning("Candidate score is below 40. Not a good fit for the role.")
-            st.stop()  # Stop further execution
-        else:
+            st.stop()
 
-            if "questions" not in st.session_state:
-                st.session_state.questions = []
-            if "evaluation_result" not in st.session_state:
-                st.session_state.evaluation_result = evaluation  # from earlier
-            if "answers" not in st.session_state:
-                st.session_state.answers = []
+        # First question after evaluation
+        first_question = suggest_interview_question(
+            groq_api_key, role, evaluation["raw"], 1
+        )
+        st.session_state.questions.append(first_question)
+        st.session_state.answers.append("")
 
-            if st.button("Generate Interview Questions"):
-                st.session_state.questions = []
-                question = suggest_interview_question(
-                    groq_api_key,
-                    role,
-                    st.session_state.evaluation_result["raw"],
+    # Continue if evaluation already happened
+    if st.session_state.evaluation_result and st.session_state.questions:
+        idx = st.session_state.current_index
+        question = st.session_state.questions[idx]
+        st.write(f"### 💬 Question {idx + 1}")
+        st.write(question)
 
+        # Text input for answer
+        answer = st.text_area(f"✍️ Candidate's Answer to Question {idx + 1}",
+                              value=st.session_state.answers[idx], key=f"answer_{idx}")
+
+        # On submission
+        if st.button("Submit Answer"):
+            st.session_state.answers[idx] = answer
+            if answer.strip():
+                result = assess_answers_and_skills(
+                    groq_api_key, role, question, answer
                 )
-                st.session_state.questions.append(question)
-                st.session_state.answers.append("")  # placeholder
+                st.write(f"🧠 Updated Evaluation for Answer {idx + 1}")
+                st.write(result)
 
-            if st.session_state.questions:
-                for i, q in enumerate(st.session_state.questions):
-                    st.write(f"### 💬 Question {i + 1}")
-                    st.write(q)
-                    st.session_state.answers[i] = st.text_area(
-                        f"✍️ Candidate's Answer {i + 1}", value=st.session_state.answers[i])
+                # Next question
+                next_question = suggest_interview_question(
+                    groq_api_key, role, st.session_state.evaluation_result["raw"], idx + 2
+                )
+                if "Sorry" in next_question:
+                    st.warning(next_question)
+                else:
+                    st.session_state.questions.append(next_question)
+                    st.session_state.answers.append("")
+                    st.session_state.current_index += 1
 
-                # Step 3: Assess Answers
-                if st.button("Assess All Answers"):
-                    for i, answer in enumerate(st.session_state.answers):
-                        if answer.strip():
-                            final_result = assess_answers_and_skills(
-                                groq_api_key,
-                                role,
-                                st.session_state.questions[i],
-                                answer
-                            )
-                            st.write(f"🧠 Updated Evaluation for Answer {i + 1}")
-                            st.write(final_result)
 
 
 if __name__ == "__main__":
