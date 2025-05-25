@@ -205,21 +205,32 @@ def main():
         st.session_state.question = suggest_interview_question(groq_api_key, role, st.session_state.evaluation_result)
         st.session_state.asked = True
 
-        # Step 3: Ask Interview Question
-    if st.session_state.asked and st.session_state.question:
-        st.write("### 💬 Interview Question")
-        st.write(st.session_state.question)
-        answer = st.text_area("✍️ Candidate's Answer")
+    count = st.selectbox(
+        "How many questions to ask?",
+        ("1", "2", "3", "4", "5"),
+        index=None,
+        placeholder="Select no.of questions",
+    )
 
+    answers=[]
+    for i in range(int(count)):
+        if st.session_state.asked and st.session_state.question:
+            st.write("### 💬 Interview Question")
+            st.write(st.session_state.question)
+            # answer = st.text_area("✍️ Candidate's Answer")
+            answers.append(st.text_area(f"✍️ Candidate's Answer {i + 1}"))
+
+
+    for i,answer in enumerate(answers):
         if st.button("Assess Answer"):
-            final_result = assess_answers_and_skills(
-                groq_api_key,
-                role,
-                st.session_state.question,
-                answer
-            )
-            st.write("### 🧠 Updated Evaluation")
-            st.write(final_result)
+                final_result = assess_answers_and_skills(
+                    groq_api_key,
+                    role,
+                    st.session_state.question,
+                    answer
+                )
+                st.write("### 🧠 Updated Evaluation")
+                st.write(final_result)
 
 
 if __name__ == "__main__":
