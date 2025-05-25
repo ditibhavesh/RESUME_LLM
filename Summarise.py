@@ -200,7 +200,7 @@ def main():
 
             # Max questions per level
             level = st.session_state.evaluation_result["level"].lower()
-            max_questions_map = {"beginner": 5, "intermediate": 4, "advanced": 3}
+            max_questions_map = {"beginner": 5, "intermediate": 2, "advanced": 3}
             max_questions = max_questions_map.get(level, 3)
 
             if idx + 1 >= max_questions:
