@@ -214,15 +214,25 @@ def main():
             st.warning("Candidate score is below 40. Not a good fit for the role.")
             st.stop()  # Stop further execution
         else:
+            # Count selection
             count = st.selectbox(
                 "How many questions to ask?",
                 ("1", "2", "3", "4", "5"),
                 index=None,
                 placeholder="Select No of questions",
             )
+
             if count:
                 count = int(count)
 
+                if "questions" not in st.session_state:
+                    st.session_state.questions = []
+                if "evaluation_result" not in st.session_state:
+                    st.session_state.evaluation_result = evaluation  # from earlier
+                if "answers" not in st.session_state:
+                    st.session_state.answers = []
+
+                # Step 1: Generate Questions
                 if st.button("Generate Interview Questions"):
                     st.session_state.questions = []
                     for i in range(count):
@@ -235,7 +245,7 @@ def main():
                         st.session_state.questions.append(question)
                         st.session_state.answers.append("")  # placeholder
 
-                    # Step 2: Ask for Answers
+                # Step 2: Ask for Answers
                 if st.session_state.questions:
                     for i, q in enumerate(st.session_state.questions):
                         st.write(f"### 💬 Question {i + 1}")
@@ -255,6 +265,7 @@ def main():
                                 )
                                 st.write(f"🧠 Updated Evaluation for Answer {i + 1}")
                                 st.write(final_result)
+
 
 if __name__ == "__main__":
     main()
